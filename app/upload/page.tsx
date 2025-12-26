@@ -24,6 +24,25 @@ export default function UploadPDFPage() {
     router.push('/login'); // Redirect manual ke login setelah logout
   };
 
+  // Helper function untuk mendapatkan NIM dari email
+  const getNimFromEmail = (email: string) => {
+    if (email && email.includes('@nim.local')) {
+      return email.replace('@nim.local', '');
+    }
+    return email || 'User';
+  };
+
+  // Helper function untuk mendapatkan NIM dari session
+  const getUserNim = () => {
+    if (session?.user?.user_metadata?.nim) {
+      return session.user.user_metadata.nim;
+    }
+    if (session?.user?.email) {
+      return getNimFromEmail(session.user.email);
+    }
+    return 'User';
+  };
+
   const uploadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
@@ -41,9 +60,9 @@ export default function UploadPDFPage() {
       }
 
       const fileExt = file.name.split('.').pop();
-      // Untuk keamanan, tambahkan user ID ke nama file atau path
-      const userId = session?.user?.id;
-      const fileName = `${userId}_${Date.now()}.${fileExt}`;
+      // Gunakan NIM untuk nama file
+      const nim = getUserNim();
+      const fileName = `${nim}_${Date.now()}.${fileExt}`;
       const filePath = `pdfs/${fileName}`; // Simpan dalam subfolder 'pdfs'
 
       let { error: uploadError } = await supabase.storage
@@ -76,7 +95,7 @@ export default function UploadPDFPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">Unggah File PDF</h1>
-        <p className="text-center text-gray-600 mb-6">Halo, {session.user?.email}!</p>
+        <p className="text-center text-gray-600 mb-6">Halo, NIM: <span className="font-semibold">{getUserNim()}</span>!</p>
 
         <input
           type="file"

@@ -86,15 +86,41 @@ export default function Home() {
     return `${mb.toFixed(2)} MB`;
   };
 
+  // Helper function untuk mendapatkan NIM dari email
+  const getNimFromEmail = (email: string) => {
+    if (email && email.includes('@nim.local')) {
+      return email.replace('@nim.local', '');
+    }
+    return email || 'User';
+  };
+
+  // Helper function untuk mendapatkan NIM dari session
+  const getUserNim = () => {
+    if (session?.user?.user_metadata?.nim) {
+      return session.user.user_metadata.nim;
+    }
+    if (session?.user?.email) {
+      return getNimFromEmail(session.user.email);
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Artikel & Halaman
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Artikel & Halaman
+              </h1>
+              {session && getUserNim() && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  NIM: <span className="font-semibold">{getUserNim()}</span>
+                </p>
+              )}
+            </div>
             <nav className="flex items-center gap-4">
               {session ? (
                 <>
