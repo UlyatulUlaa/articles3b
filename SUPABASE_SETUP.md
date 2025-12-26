@@ -46,13 +46,28 @@ TO authenticated
 WITH CHECK (bucket_id = 'uploads');
 ```
 
-#### Policy 2: Allow Users to Read Their Own Files
+#### Policy 2: Allow Public Read Access (Untuk Menampilkan File di Halaman Depan)
 
-**Policy Name:** `Allow users to read their files`
+**Policy Name:** `Allow public to read files`
 
 **Policy Definition:**
 ```sql
-CREATE POLICY "Allow users to read their files"
+CREATE POLICY "Allow public to read files"
+ON storage.objects
+FOR SELECT
+TO public
+USING (bucket_id = 'uploads');
+```
+
+**Catatan:** Policy ini memungkinkan siapa saja (termasuk yang belum login) untuk melihat dan mengunduh file. Jika ingin file hanya bisa diakses oleh user yang login, gunakan policy di bawah ini.
+
+#### Policy 2b: Allow Authenticated Users to Read Files (Alternatif)
+
+**Policy Name:** `Allow authenticated users to read files`
+
+**Policy Definition:**
+```sql
+CREATE POLICY "Allow authenticated users to read files"
 ON storage.objects
 FOR SELECT
 TO authenticated

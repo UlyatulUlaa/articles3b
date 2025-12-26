@@ -24,6 +24,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Fetch files tanpa bergantung pada session - bisa diakses publik
   useEffect(() => {
     fetchFiles();
   }, []);
@@ -34,6 +35,7 @@ export default function Home() {
       setError('');
 
       // Ambil daftar file dari storage Supabase
+      // Tidak memerlukan authentication - bisa diakses publik
       const { data, error: listError } = await supabase.storage
         .from('uploads')
         .list('pdfs', {
@@ -42,7 +44,14 @@ export default function Home() {
           sortBy: { column: 'created_at', order: 'desc' },
         });
 
-      if (listError) throw listError;
+      if (listError) {
+        // Jika error karena policy, beri pesan yang lebih informatif
+        if (listError.message.includes('row-level security') || 
+            listError.message.includes('permission denied')) {
+          throw new Error('Akses ditolak. Pastikan policy "Allow public to read files" sudah dibuat di Supabase Storage.');
+        }
+        throw listError;
+      }
 
       // Format data file
       const formattedFiles: FileItem[] = (data || []).map((file) => ({
@@ -56,7 +65,7 @@ export default function Home() {
       setFiles(formattedFiles);
     } catch (err: any) {
       setError(`Gagal memuat file: ${err.message}`);
-      console.error(err);
+      console.error('Error fetching files:', err);
     } finally {
       setLoading(false);
     }
@@ -167,7 +176,7 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {sessionLoading || loading ? (
+        {loading ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
@@ -200,12 +209,19 @@ export default function Home() {
               <p className="mt-2 text-gray-600 dark:text-gray-400">
                 Mulai dengan mengunggah file PDF pertama Anda.
               </p>
-              {session && (
+              {session ? (
                 <Link
                   href="/upload"
                   className="mt-6 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Unggah PDF
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="mt-6 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Login untuk Mengunggah
                 </Link>
               )}
             </div>

@@ -16,12 +16,20 @@ FOR INSERT
 TO authenticated
 WITH CHECK (bucket_id = 'uploads');
 
--- Policy untuk SELECT (Read/Download)
-CREATE POLICY IF NOT EXISTS "Allow authenticated users to read"
+-- Policy untuk SELECT (Read/Download) - PUBLIC ACCESS
+-- Policy ini memungkinkan siapa saja (termasuk yang belum login) untuk melihat file
+CREATE POLICY IF NOT EXISTS "Allow public to read files"
 ON storage.objects
 FOR SELECT
-TO authenticated
+TO public
 USING (bucket_id = 'uploads');
+
+-- Alternatif: Jika ingin hanya user terautentikasi yang bisa membaca
+-- CREATE POLICY IF NOT EXISTS "Allow authenticated users to read"
+-- ON storage.objects
+-- FOR SELECT
+-- TO authenticated
+-- USING (bucket_id = 'uploads');
 
 -- Policy untuk DELETE (Hapus file)
 CREATE POLICY IF NOT EXISTS "Allow authenticated users to delete"
