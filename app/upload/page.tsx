@@ -47,6 +47,14 @@ export default function UploadPDFPage() {
     try {
       setUploading(true);
       setMessage('');
+
+      // Pastikan session ada
+      if (!session) {
+        setMessage('Anda harus login terlebih dahulu.');
+        router.push('/login');
+        return;
+      }
+
       const file = event.target.files?.[0];
 
       if (!file) {
@@ -65,19 +73,41 @@ export default function UploadPDFPage() {
       const fileName = `${nim}_${Date.now()}.${fileExt}`;
       const filePath = `pdfs/${fileName}`; // Simpan dalam subfolder 'pdfs'
 
-      let { error: uploadError } = await supabase.storage
+      // Pastikan menggunakan client dengan session yang benar
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setMessage('Session tidak valid. Silakan login ulang.');
+        router.push('/login');
+        return;
+      }
+
+      // Upload file dengan metadata user
+      const { data, error: uploadError } = await supabase.storage
         .from('uploads') // Pastikan nama bucket ini sama dengan yang Anda buat di Supabase
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
+          contentType: 'application/pdf',
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        
+        // Berikan pesan error yang lebih informatif
+        if (uploadError.message.includes('row-level security')) {
+          throw new Error('Policy keamanan belum dikonfigurasi. Silakan hubungi administrator atau lihat dokumentasi untuk mengatur policy di Supabase Storage.');
+        }
+        throw uploadError;
+      }
 
-      setMessage('File PDF berhasil diunggah!');
+      if (data) {
+        setMessage('File PDF berhasil diunggah!');
+        // Reset input file
+        event.target.value = '';
+      }
     } catch (error: any) {
+      console.error('Upload error:', error);
       setMessage(`Gagal mengunggah file: ${error.message}`);
-      console.error(error);
     } finally {
       setUploading(false);
     }
