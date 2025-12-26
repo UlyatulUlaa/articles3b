@@ -34,9 +34,10 @@ export default function Home() {
       setLoading(true);
       setError('');
 
-      // Ambil daftar file dari storage Supabase
-      // Tidak memerlukan authentication - bisa diakses publik
-      const { data, error: listError } = await supabase.storage
+      console.log('Fetching files from Supabase storage...');
+
+      // Coba list dari folder 'pdfs' terlebih dahulu
+      let { data, error: listError } = await supabase.storage
         .from('uploads')
         .list('pdfs', {
           limit: 100,
@@ -44,37 +45,69 @@ export default function Home() {
           sortBy: { column: 'created_at', order: 'desc' },
         });
 
+      // Jika folder 'pdfs' tidak ada atau error, coba list dari root
       if (listError) {
-        // Jika error karena policy, beri pesan yang lebih informatif
-        if (listError.message.includes('row-level security') || 
-            listError.message.includes('permission denied')) {
-          throw new Error('Akses ditolak. Pastikan policy "Allow public to read files" sudah dibuat di Supabase Storage.');
+        console.warn('Error listing from pdfs folder:', listError);
+        
+        // Coba list dari root bucket
+        const { data: rootData, error: rootError } = await supabase.storage
+          .from('uploads')
+          .list('', {
+            limit: 100,
+            offset: 0,
+            sortBy: { column: 'created_at', order: 'desc' },
+          });
+
+        if (rootError) {
+          console.error('Error listing from root:', rootError);
+          
+          // Jika error karena policy, beri pesan yang lebih informatif
+          if (rootError.message.includes('row-level security') || 
+              rootError.message.includes('permission denied') ||
+              rootError.message.includes('new row violates')) {
+            throw new Error('Akses ditolak. Pastikan policy "Allow public to read files" sudah dibuat di Supabase Storage. Lihat file SUPABASE_SETUP.md untuk instruksi.');
+          }
+          throw rootError;
         }
-        throw listError;
+
+        // Filter hanya file PDF dari root
+        data = rootData?.filter(file => 
+          file.name.toLowerCase().endsWith('.pdf') && 
+          !file.name.includes('/') // Hanya file di root, bukan di folder
+        ) || [];
       }
+
+      console.log('Files found:', data?.length || 0);
 
       // Format data file
       const formattedFiles: FileItem[] = (data || []).map((file) => ({
         name: file.name,
-        id: file.id,
-        created_at: file.created_at,
-        updated_at: file.updated_at,
+        id: file.id || file.name, // Fallback jika id tidak ada
+        created_at: file.created_at || new Date().toISOString(),
+        updated_at: file.updated_at || file.created_at || new Date().toISOString(),
         metadata: file.metadata,
       }));
 
+      console.log('Formatted files:', formattedFiles.length);
       setFiles(formattedFiles);
     } catch (err: any) {
-      setError(`Gagal memuat file: ${err.message}`);
       console.error('Error fetching files:', err);
+      setError(`Gagal memuat file: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const getFileUrl = (fileName: string) => {
+    // Cek apakah file sudah ada path 'pdfs/' atau belum
+    const filePath = fileName.startsWith('pdfs/') 
+      ? fileName 
+      : `pdfs/${fileName}`;
+    
     const { data } = supabase.storage
       .from('uploads')
-      .getPublicUrl(`pdfs/${fileName}`);
+      .getPublicUrl(filePath);
+    
     return data.publicUrl;
   };
 
@@ -184,8 +217,40 @@ export default function Home() {
             </div>
           </div>
         ) : error ? (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-            <p className="text-red-800 dark:text-red-200">{error}</p>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-6">
+            <div className="flex items-start">
+              <svg className="w-6 h-6 text-red-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Memuat File</h3>
+                <p className="text-red-700 dark:text-red-300 text-sm mb-4">{error}</p>
+                <div className="bg-red-100 dark:bg-red-900/30 rounded p-4 text-xs text-red-800 dark:text-red-200 mb-4">
+                  <p className="font-semibold mb-2">Solusi Cepat:</p>
+                  <ol className="list-decimal list-inside space-y-1 mb-3">
+                    <li>Buka Supabase Dashboard → Storage → Policies</li>
+                    <li>Pilih bucket "uploads"</li>
+                    <li>Buka SQL Editor dan jalankan script berikut:</li>
+                  </ol>
+                  <pre className="mt-2 p-3 bg-red-50 dark:bg-red-950 rounded text-xs overflow-x-auto border border-red-200 dark:border-red-800">
+{`CREATE POLICY IF NOT EXISTS "Allow public to read files"
+ON storage.objects
+FOR SELECT
+TO public
+USING (bucket_id = 'uploads');`}
+                  </pre>
+                </div>
+                <button
+                  onClick={fetchFiles}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Coba Lagi
+                </button>
+              </div>
+            </div>
           </div>
         ) : files.length === 0 ? (
           <div className="text-center py-16">
